@@ -5,7 +5,16 @@ mysql_root_password: 'pass'
 mysql_port: 3306
 mysql_bind_address: "0.0.0.0"
 mysql_language: '/usr/share/mysql/'
-mysql_datadir: '/var/lib/mysql_datadir'
+mysql_datadir: '/var/lib/mysql'
+
+# Percona settings
+percona_package: percona-xtradb-cluster-56
+
+# Cluster settings
+wsrep_slave_threads: 2
+wsrep_sst_method: rsync
+percona_master_node: false
+bootstrapping: false  # The task will set this to true if the package is installed on the master node
 
 # Fine Tuning
 mysql_key_buffer: '16M'
@@ -32,12 +41,3 @@ mysql_innodb_flush_log_at_trx_commit: 1
 mysql_innodb_lock_wait_timeout: 50
 mysql_innodb_log_buffer_size: '1M'
 mysql_innodb_log_file_size: '5M'
-
-# Create from a DB dump?
-create_app_db: false
-db_name: mydatabase
-db_collation: utf8_general_ci
-db_user: myuser
-db_user_password: anotherreallylongpassword
-db_host: "%"
-db_dump_file: ""

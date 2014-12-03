@@ -1,6 +1,6 @@
 # Ansible Role: Percona
 
-Ansible playbook to install Percona MySQL server on Debian/Ubuntu servers
+Ansible playbook to install Percona XtraDB MySQL Cluster on Debian/Ubuntu servers
 
 ## Requirements
 
@@ -10,38 +10,53 @@ None.
 
 Available variables are listed below with its default values.
 
-	root_password: reallylongpassword
+	mysql_root_password: reallylongpassword
+  percona_package: percona-xtradb-cluster-56
 
 Define the MySQL root password, this password will be used to create a **/root/.my.cnf** to allow root mysql connections without password
 
-	port: 3306
-	bind_address: 0.0.0.0
+	mysql_port: 3306
+	mysql_bind_address: 0.0.0.0
 
 Define port and bind address for MySQL connections
 
-	max_allowed_packet: 16M
-	key_buffer: 16M
-	thread_stack: 192K
-	thread_cache_size: 8
+	mysql_max_allowed_packet: 16M
+	mysql_key_buffer: 16M
+	mysql_thread_stack: 192K
+	mysql_cache_size: 8
 
-Define some values to tuning the database server
+Various other settings are available in defaults/main.yml
 
-	sqldebug: true
-	log_slow_queries: log_slow_queries    = /var/log/mysql/mysql-slow.log
-	long_query_time: long_query_time      = 2
-	log_queries_not_using_indexes: log-queries-not-using-indexes
+## Cluster configuration
+If using a cluster define at least `wsrep_cluster_name` and `wsrep_cluster_hosts`(a list of hosts) and optionally other settings:
 
-If **sqldebug** is true this playbook will configure Percona MySQL with slow queries debug logs, if you want to disable this debug information you have to set **sqldebug: false**
+  wsrep_slave_threads: 2
+  wsrep_sst_method: rsync
 
-	create_app_db: true
-	db_name: mydatabase
-	db_collation: utf8_general_ci
-	db_user: myuser
-	db_user_password: anotherreallylongpassword
-	db_host: "%"
-	db_dump_file: ""
+Additionally one node should be set with `percona_master_node` to true. This is because a percona cluster must be started with the
+bootsrap-pxc command on its first start. The percona_master_node will attempt to start with the bootstrap when its package is
+installed and should be the first node in a cluster to run.
 
-If **create_app_db** is true this playbook will configura an application database, you can set a path for a SQL dump file if you want to restore data in the new application database
+These are optional variables that default to undefined
+
+  wsrep_node_name
+  wsrep_notify_cmd
+  wsrep_sst_receive_address
+  wsrep_sst_auth
+
+## SSL Configuration
+
+If mysql_ssl_key is defined then ssl is enabled and all of the below ssl variables need to be defined.
+
+- mysql_ssl_ca
+- mysql_ssl_cert
+- mysql_ssl_key
+
+Optionally to copy in the appropriate certs define these variables
+
+- mysql_ssl_ca_src
+- mysql_ssl_cert_src
+- mysql_ssl_key_src
 
 ## Dependencies
 
@@ -51,23 +66,10 @@ None.
 
 	---
 	- hosts: all
-	  user: vagrant
 	  sudo: true
-	  vars:
-		  - db_name: mydb
-		  - db_user: myuser
-		  - db_host: localhost
-		  - db_user_password: mypassword
-		  - db_dump_file: /tmp/dump.sql.bz2
 	  roles:
-		  - overdrive3000.ansible-percona
+		  - tkuhlman.ansible-percona
 
 ## License
 
 MIT / BSD
-
-## Notes
-
-This is my first playbook it is a beta version and can be improved, please help me to improve and fix bugs for this playbook.
-
-Thanks.

@@ -1,3 +1,7 @@
 ---
 - name: restart percona
   action: service name=mysql state=restarted
+  when: not bootstrapping  # skip the restart if a bootstrap is happening
+
+- name: wait for mysql port
+  wait_for: port={{mysql_port}} state=started

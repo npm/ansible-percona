@@ -10,59 +10,57 @@
 - name: Install percona database server
   action: apt pkg={{ item }} state=latest
   with_items:
-          - percona-server-server-5.5
-          - percona-server-client-5.5
+          - "{{ percona_package }}"
           - percona-toolkit
           - percona-xtrabackup
           - python-mysqldb
-
-- name: Stop percona
-  sudo: true
-  command: service mysql stop
-
-- name: Ensure datadir exists
-  sudo: true
-  file: >
-    path={{ mysql_datadir }}
-    state=directory
-    owner=mysql
-    group=mysql
-
-- name: Ensure default datadir is not still there
-  sudo: true
-  file: >
-    path=/var/lib/mysql
-    state=absent
-
-- name: Ensure symlink from /var/lib/mysql to datadir
-  sudo: true
-  file: >
-    path=/var/lib/mysql
-    src={{ mysql_datadir }}
-    state=link
-    force=yes
-    owner=mysql
-    group=mysql
+  register: install_result
   notify:
-          - restart percona
-
-- name: Initialize the datadir if it's not already populated
-  sudo: true
-  command: mysql_install_db --datadir={{ mysql_datadir }} --user=mysql
-
-- name: Force datadir to be owned by mysql because mysql_install_db is shit
-  sudo: true
-  command: chown -R mysql:mysql {{ mysql_datadir }}
+    - restart percona
+    - wait for mysql port
 
 - name: Write custom server configuration
   template: src=etc_mysql_my.cnf.j2 dest=/etc/mysql/my.cnf owner=root mode=0600
+  notify:
+    - restart percona
+    - wait for mysql port
 
-- name: Restart percona
-  sudo: true
-  command: service mysql start
+- name: Copy SSL ca
+  copy: dest={{mysql_ssl_ca}} src={{mysql_ssl_ca_src}}
+  when: mysql_ssl_ca_src is defined
+  notify:
+    - restart percona
+    - wait for mysql port
 
+- name: Copy SSL cert
+  copy: dest={{mysql_ssl_cert}} src={{mysql_ssl_cert_src}}
+  when: mysql_ssl_cert_src is defined
+  notify:
+    - restart percona
+    - wait for mysql port
+
+- name: Copy SSL key
+  copy: dest={{mysql_ssl_key}} src={{mysql_ssl_key_src}}
+  when: mysql_ssl_key_src is defined
+  notify:
+    - restart percona
+    - wait for mysql port
+
+- name: Detect bootstrapping
+  set_fact:
+    bootstrapping: true
+  when: percona_master_node and install_result|changed
+
+- name: Run bootstrap-pxc on this node
+  command: /etc/init.d/mysql bootstrap-pxc
+  when: bootstrapping
+
+- name: Copy .my.cnf file into the root home folder
+  template: src=root-my-cnf.j2 dest=/root/.my.cnf owner=root mode=0600
+
+- meta: flush_handlers  # Restart now before attempting to set root password
 - name: update mysql root password for all root accounts
-  mysql_user: name=root host={{ item }} password={{ mysql_root_password }}
+  mysql_user: name=root host={{ item }} password={{ mysql_root_password }} check_implicit_admin=yes
   with_items:
    - "{{ ansible_hostname }}"
    - 127.0.0.1
@@ -71,15 +69,12 @@
   when: ansible_hostname != 'localhost'
 
 - name: update mysql root password for all root accounts
-  mysql_user: name=root host={{ item }} password={{ mysql_root_password }}
+  mysql_user: name=root host={{ item }} password={{ mysql_root_password }} check_implicit_admin=yes
   with_items:
    - 127.0.0.1
    - ::1
    - localhost
   when: ansible_hostname == 'localhost'
-
-- name: Copy .my.cnf file into the root home folder
-  template: src=root-my-cnf.j2 dest=~/.my.cnf owner=root mode=0600
 
 - name: Ensure anonymous users are not in the database
   mysql_user: name='' host={{ item }} state=absent

@@ -11,6 +11,7 @@ socket      = /var/run/mysqld/mysqld.sock
 [mysqld_safe]
 socket      = /var/run/mysqld/mysqld.sock
 nice        = 0
+open-files-limit = 16384
 
 [mysqld]
 # * Basic Settings
@@ -26,6 +27,29 @@ language = {{ mysql_language }}
 bind-address = {{ mysql_bind_address }}
 skip-external-locking
 
+{% if wsrep_cluster_name is defined %}
+# Cluster settings
+binlog_format                  = ROW
+wsrep_provider                 = /usr/lib/libgalera_smm.so
+wsrep_cluster_address          = gcomm://{{ wsrep_cluster_hosts|join(',') }}
+wsrep_slave_threads            = {{ wsrep_slave_threads }}
+wsrep_cluster_name             = {{ wsrep_cluster_name }}
+wsrep_sst_method               = {{wsrep_sst_method}}
+{% if wsrep_node_name is defined %}
+wsrep_node_name = {{ wsrep_node_name }}
+{% endif %}
+{% if wsrep_notify_cmd is defined %}
+wsrep_notify_cmd = {{ wsrep_notify_cmd }}
+{% endif %}
+{% if wsrep_sst_receive_address is defined %}
+wsrep_sst_receive_address = {{ wsrep_sst_receive_address }}
+{% endif %}
+{% if wsrep_sst_auth is defined %}
+wsrep_sst_auth = {{ wsrep_sst_auth }}
+{% endif %}
+innodb_locks_unsafe_for_binlog = 1
+innodb_autoinc_lock_mode       = 2
+{% endif %}
 
 # * Fine Tuning
 key_buffer_size         = {{ mysql_key_buffer }}
@@ -73,11 +97,12 @@ innodb_log_file_size = {{ mysql_innodb_log_file_size }}
 # ** Security Features
 # Read the manual, too, if you want chroot!
 # chroot = /var/lib/mysql/
-#
-# For generating SSL certificates I recommend the OpenSSL GUI "tinyca".
-# ssl-ca=/etc/mysql/cacert.pem
-# ssl-cert=/etc/mysql/server-cert.pem
-# ssl-key=/etc/mysql/server-key.pem
+
+{% if mysql_ssl_key is defined %}
+ssl-ca=/etc/mysql/cacert.pem
+ssl-cert=/etc/mysql/server-cert.pem
+ssl-key=/etc/mysql/server-key.pem
+{% endif %}
 
 character_set_server = {{ mysql_character_set_server }}
 collation_server = {{ mysql_collation_server }}
